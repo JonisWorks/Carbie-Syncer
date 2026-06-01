@@ -73,6 +73,9 @@ The CAD files for the custom enclosure (`carbie_syncer_box_lower.step` and `carb
 2. Connect the vacuum hoses to your engine's intake manifold barbs. Ensure a snug fit; loose hoses cause vacuum leaks and completely false readings.
 3. Start the engine and adjust your carburetor synchronization screws until the lines on the live graph merge.
 
+## Additional Info
+1. Photos, proper wiring diagram and video to follow.
+
 ## DISCLAIMER
 1. This project is provided "as is". While the 5V circuitry is generally very safe, I am not responsible for any damaged property, fires, or personal injury that may occur while building or using this tool or your bikes performance. While I want to help and provide this project as best as I can there could be bugs.   
 
