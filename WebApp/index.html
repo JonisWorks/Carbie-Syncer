@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4-Cylinder Carbie Syncer</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #121212; color: white; margin: 0; padding: 15px; }
+        .controls { margin-bottom: 15px; }
+        button { padding: 12px 20px; font-size: 16px; margin: 5px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        #connectBtn { background-color: #007bff; color: white; }
+        #zeroBtn { background-color: #dc3545; color: white; display: none; }
+        
+        /* Bar Gauges */
+        .gauge-container { display: flex; justify-content: center; gap: 15px; margin-top: 10px; height: 250px; }
+        .gauge { width: 60px; background-color: #333; border-radius: 8px; position: relative; overflow: hidden; border: 2px solid #555; }
+        .bar { width: 100%; position: absolute; bottom: 0; background-color: #28a745; transition: height 0.1s linear, background-color 0.2s ease; }
+        .reference-line { position: absolute; width: 100%; height: 2px; background-color: rgba(255, 255, 255, 0.4); top: 50%; left: 0; z-index: 10; pointer-events: none;}
+        
+        /* Text Readouts */
+        .labels { display: flex; justify-content: center; gap: 15px; margin-top: 10px; font-size: 18px; font-weight: bold; }
+        .label { width: 60px; text-align: center; }
+        .readouts { display: flex; justify-content: center; gap: 15px; margin-top: 5px; font-size: 16px; font-weight: bold; }
+        
+        /* Matched Graph Colors */
+        #c1 { color: #00d2ff; } /* Cyan */
+        #c2 { color: #ff007b; } /* Pink */
+        #c3 { color: #ffea00; } /* Yellow */
+        #c4 { color: #b700ff; } /* Purple */
+        .readout { width: 60px; text-align: center; font-family: monospace; }
+        
+        #status { margin-top: 5px; font-size: 14px; color: #aaa; margin-bottom: 10px;}
+        
+        /* The New Live Graph */
+        .graph-container { display: flex; justify-content: center; margin-top: 20px; width: 100%; }
+        canvas { background-color: #1e1e1e; border: 2px solid #444; border-radius: 8px; width: 95%; max-width: 500px; height: 180px; }
+    </style>
+</head>
+<body>
+
+    <h2>Carbie Syncer</h2>
+    
+    <div class="controls">
+        <button id="connectBtn">Connect BLE Tool</button>
+        <button id="zeroBtn">Zero Sensors</button>
+    </div>
+    <div id="status">Status: Disconnected</div>
+
+    <div class="gauge-container">
+        <div class="gauge"><div class="reference-line"></div><div class="bar" id="bar1" style="height: 50%;"></div></div>
+        <div class="gauge"><div class="reference-line"></div><div class="bar" id="bar2" style="height: 50%;"></div></div>
+        <div class="gauge"><div class="reference-line"></div><div class="bar" id="bar3" style="height: 50%;"></div></div>
+        <div class="gauge"><div class="reference-line"></div><div class="bar" id="bar4" style="height: 50%;"></div></div>
+    </div>
+    
+    <div class="labels">
+        <div class="label" id="c1">Cyl 1</div>
+        <div class="label" id="c2">Cyl 2</div>
+        <div class="label" id="c3">Cyl 3</div>
+        <div class="label" id="c4">Cyl 4</div>
+    </div>
+
+    <div class="readouts">
+        <div class="readout" id="val1">0.0</div>
+        <div class="readout" id="val2">0.0</div>
+        <div class="readout" id="val3">0.0</div>
+        <div class="readout" id="val4">0.0</div>
+    </div>
+
+    <div class="graph-container">
+        <canvas id="historyGraph" width="500" height="180"></canvas>
+    </div>
+
+    <script>
+        const connectBtn = document.getElementById('connectBtn');
+        const zeroBtn = document.getElementById('zeroBtn');
+        const statusText = document.getElementById('status');
+        
+        const bars = [
+            document.getElementById('bar1'), document.getElementById('bar2'),
+            document.getElementById('bar3'), document.getElementById('bar4')
+        ];
+        
+        const vals = [
+            document.getElementById('val1'), document.getElementById('val2'),
+            document.getElementById('val3'), document.getElementById('val4')
+        ];
+
+        // Canvas Setup
+        const canvas = document.getElementById('historyGraph');
+        const ctx = canvas.getContext('2d');
+        const graphColors = ["#00d2ff", "#ff007b", "#ffea00", "#b700ff"]; // Cyan, Pink, Yellow, Purple
+        
+        // Data Logging Arrays (Stores the last 100 points per cylinder)
+        const maxHistory = 100;
+        let dataHistory = [[], [], [], []];
+
+        const serviceUuid = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+        const characteristicUuid = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+        let myCharacteristic;
+
+        // Tuning Variables
+        const calibrationMultiplier = 0.15; 
+        const greenThreshold = 3.0;  
+        const yellowThreshold = 8.0; 
+
+        connectBtn.addEventListener('click', async () => {
+            try {
+                statusText.innerText = "Requesting Bluetooth...";
+                const device = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: 'Carbie_Syncer' }],
+                    optionalServices: [serviceUuid]
+                });
+
+                statusText.innerText = "Connecting...";
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(serviceUuid);
+                myCharacteristic = await service.getCharacteristic(characteristicUuid);
+
+                await myCharacteristic.startNotifications();
+                myCharacteristic.addEventListener('characteristicvaluechanged', handleData);
+                
+                statusText.innerText = "Status: Connected!";
+                statusText.style.color = "#28a745";
+                connectBtn.style.display = "none";
+                zeroBtn.style.display = "inline-block";
+
+            } catch (error) {
+                console.log(error);
+                statusText.innerText = "Connection failed: " + error;
+            }
+        });
+
+        zeroBtn.addEventListener('click', async () => {
+            if (myCharacteristic) {
+                const encoder = new TextEncoder();
+                await myCharacteristic.writeValue(encoder.encode("ZERO"));
+                statusText.innerText = "Sensors Zeroed!";
+                dataHistory = [[], [], [], []]; // Clear the graph on zero
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                setTimeout(() => statusText.innerText = "Status: Connected!", 2000);
+            }
+        });
+
+        function handleData(event) {
+            const value = new TextDecoder().decode(event.target.value);
+            const data = value.split(',');
+            
+            if(data.length === 4) {
+                let scaledValues = [];
+                let total = 0;
+
+                for(let i=0; i<4; i++) {
+                    let val = Math.abs(parseInt(data[i]) * calibrationMultiplier); 
+                    scaledValues.push(val);
+                    total += val;
+                    
+                    // Log to history array for the graph
+                    dataHistory[i].push(val);
+                    if(dataHistory[i].length > maxHistory) {
+                        dataHistory[i].shift(); // Remove oldest data point
+                    }
+                }
+
+                let average = total / 4.0;
+
+                for(let i=0; i<4; i++) {
+                    let currentVal = scaledValues[i];
+                    vals[i].innerText = currentVal.toFixed(1);
+
+                    let difference = Math.abs(currentVal - average);
+
+                    // Update Bar Colors based on how close they are to the average
+                    if (difference <= greenThreshold) {
+                        bars[i].style.backgroundColor = "#28a745"; 
+                    } else if (difference <= yellowThreshold) {
+                        bars[i].style.backgroundColor = "#ffc107"; 
+                    } else {
+                        bars[i].style.backgroundColor = "#dc3545"; 
+                    }
+
+                    let height = 50 - (parseInt(data[i]) * 0.25); 
+                    height = Math.max(0, Math.min(100, height)); 
+                    bars[i].style.height = height + "%";
+                }
+                
+                // Draw the updated graph
+                drawGraph();
+            }
+        }
+
+        function drawGraph() {
+            // Clear the canvas for the next frame
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Find the highest value currently on the screen to auto-scale the graph
+            let highestVal = 10; // Minimum scale
+            for(let i=0; i<4; i++) {
+                let maxInArray = Math.max(...dataHistory[i]);
+                if(maxInArray > highestVal) highestVal = maxInArray;
+            }
+            // Add a little padding to the top
+            highestVal *= 1.2; 
+
+            // Draw the lines
+            ctx.lineWidth = 3;
+            ctx.lineJoin = 'round';
+
+            for(let i=0; i<4; i++) {
+                if(dataHistory[i].length < 2) continue;
+                
+                ctx.beginPath();
+                ctx.strokeStyle = graphColors[i];
+
+                for(let j=0; j<dataHistory[i].length; j++) {
+                    // X axis: stretch the data points across the width of the canvas
+                    let x = (j / (maxHistory - 1)) * canvas.width;
+                    
+                    // Y axis: scale the value to the canvas height (flipped because Y is down)
+                    let y = canvas.height - ((dataHistory[i][j] / highestVal) * canvas.height);
+                    
+                    if(j === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                ctx.stroke();
+            }
+        }
+    </script>
+</body>
+</html>
