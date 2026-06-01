@@ -32,8 +32,7 @@ Because the ESP32 operates at 3.3V and the sensors output 5V, you **must** use a
 
 **⚠️ WARNING: Pinouts are probably not universal. While the Polcar E10-0066 and Bosch 0-261-230-119 uses Pins 1 - 5v, 2 - GND, and 3 - SIGNAL, other brands (like GM, Denso, or Delphi) might have a completely different pin order. Always look up the pinout diagram for your specific sensor before wiring it up, source cheapest ( my way at least) identical sensors.**
 
-Repeat this wiring circuit exactly 4 times (one for each MAP sensor) :
-
+```text
 [MAP Sensor +5V Pin 1]  -------> Connect to Shared 5V Power Rail
 [MAP Sensor GND Pin 2]  -------> Connect to Shared Ground Rail
 
@@ -46,6 +45,7 @@ Repeat this wiring circuit exactly 4 times (one for each MAP sensor) :
    [20k Ω Resistor] ───┐
        │               │
    [4.7µF Capacitor] ──┴────> Connect to Shared Ground Rail
+```
 
 *(Note: Ensure your external 5V power supply shares a common Ground wire with the ESP32!)*
 
