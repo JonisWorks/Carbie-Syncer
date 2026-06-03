@@ -1,6 +1,6 @@
 # Carbie-Syncer
 
-A DIY, highly accurate, Bluetooth 4-cylinder digital sync tool for motorcycle carburetors and throttle bodies. Built on an ESP32 and automotive MAP sensors, it broadcasts real-time vacuum data directly to your phone.
+A DIY, somehow accurate, Bluetooth 4-cylinder digital sync tool for motorcycle carburetors and throttle bodies. Built on an ESP32 and automotive MAP sensors, it broadcasts real-time vacuum data directly to your phone.
 
 ## Features
 * **100% Wireless:** Read live data on your phone via Web Bluetooth.
@@ -11,7 +11,7 @@ A DIY, highly accurate, Bluetooth 4-cylinder digital sync tool for motorcycle ca
 
 ## Bill of Materials
 * 1x **ESP32-S3 Development Board**
-* 4x **Automotive MAP Sensors** (1-Bar recommended; cheap 3-Bar turbo sensors work fine using the web app's heavier filter profiles).
+* 4x **Automotive MAP Sensors** 3 pin, 5v (1-Bar recommended; cheap 3-Bar turbo sensors should work fine using the web app's heavier filter profiles).
 * 4x **10kΩ Resistors** & 4x **20kΩ Resistors** (For the voltage divider)
 * 4x **4.7µF Ceramic Capacitors**
 * 1x **5V Power Source** (Standard USB)
@@ -53,15 +53,15 @@ There is nothing to install.
 
 ## Operating Instructions
 
-1. Power Up: Turn on the ESP32 and connect your phone.
+1. **Power Up**: Turn on the ESP32 and connect your phone.
 
-2. Hook up Hoses: Attach hoses tightly to the engine's intake barbs. (Crucial: Cylinder 1 MUST be connected to get an RPM reading).
+2. **Hook up Hoses**: Attach hoses tightly to the engine's intake barbs. (Crucial: Cylinder 1 MUST be connected to get an RPM reading).
 
-3. Calibrate: With hoses connected but the ENGINE OFF, press "Zero Sensors". This accounts for garage air pressure and hose compression.
+3. **Calibrate**: With hoses connected but the ENGINE OFF, press "Zero Sensors". This accounts for garage air pressure and hose compression.
 
-4. Select Profile: Pick your sensor type from the dropdown (e.g., 3-Bar Default, or 1-Bar Fast).
+4. **Select Profile**: Pick your sensor type from the dropdown (e.g., 3-Bar Default, or 1-Bar Fast).
 
-5. Tune: Start the engine and adjust sync screws until all lines merge.
+5. **Tune**: Start the engine and adjust sync screws until all lines merge.
 
 ## DISCLAIMER
 1. This project is provided "as is". While the 5V circuitry is generally very safe, I am not responsible for any damaged property, fires, or personal injury that may occur while building or using this tool or your bikes performance. While I want to help and provide this project as best as I can there could be bugs.   
