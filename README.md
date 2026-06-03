@@ -6,7 +6,7 @@ A DIY, somehow accurate, Bluetooth 4-cylinder digital sync tool for motorcycle c
 * **100% Wireless:** Read live data on your phone via Web Bluetooth.
 * **The "Braid" Graph:** Live chart visualizes vacuum spikes to perfectly sync all cylinders.
 * **Digital Tachometer:** Calculates RPM purely from Cylinder 1's vacuum pulses—no ignition wiring needed.
-* **Live Sensor Profiles:** Swap mathematical filtering (1-Bar to 3-Bar) instantly via the web app.
+* **Live Sensor Profiles:** Swap mathematical filtering profiles instantly via the web app.
 * **Auto-Averaging:** Color-coded bars guide your physical adjustments.
 
 ## Bill of Materials
