@@ -5,10 +5,11 @@
     <title>4-Cylinder Carbie Syncer</title>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; background-color: #121212; color: white; margin: 0; padding: 15px; }
-        .controls { margin-bottom: 15px; }
-        button { padding: 12px 20px; font-size: 16px; margin: 5px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        #connectBtn { background-color: #007bff; color: white; }
-        #zeroBtn { background-color: #dc3545; color: white; display: none; }
+        .controls { margin-bottom: 15px; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; align-items: center; }
+        button, select { padding: 12px; font-size: 16px; border: none; border-radius: 8px; font-weight: bold; }
+        select { background-color: #333; color: white; border: 1px solid #555; cursor: pointer; display: none; }
+        #connectBtn { background-color: #007bff; color: white; cursor: pointer; }
+        #zeroBtn { background-color: #dc3545; color: white; display: none; cursor: pointer; }
         
         /* Bar Gauges */
         .gauge-container { display: flex; justify-content: center; gap: 15px; margin-top: 10px; height: 250px; }
@@ -16,21 +17,18 @@
         .bar { width: 100%; position: absolute; bottom: 0; background-color: #28a745; transition: height 0.1s linear, background-color 0.2s ease; }
         .reference-line { position: absolute; width: 100%; height: 2px; background-color: rgba(255, 255, 255, 0.4); top: 50%; left: 0; z-index: 10; pointer-events: none;}
         
-        /* Text Readouts */
+        /* Text Readouts & RPM */
         .labels { display: flex; justify-content: center; gap: 15px; margin-top: 10px; font-size: 18px; font-weight: bold; }
         .label { width: 60px; text-align: center; }
         .readouts { display: flex; justify-content: center; gap: 15px; margin-top: 5px; font-size: 16px; font-weight: bold; }
-        
-        /* Matched Graph Colors */
-        #c1 { color: #00d2ff; } /* Cyan */
-        #c2 { color: #ff007b; } /* Pink */
-        #c3 { color: #ffea00; } /* Yellow */
-        #c4 { color: #b700ff; } /* Purple */
         .readout { width: 60px; text-align: center; font-family: monospace; }
         
+        #rpmDisplay { font-size: 28px; font-weight: bold; color: #ff9800; margin-top: 15px; margin-bottom: 5px; font-family: monospace; }
+
+        #c1 { color: #00d2ff; } #c2 { color: #ff007b; } #c3 { color: #ffea00; } #c4 { color: #b700ff; } 
         #status { margin-top: 5px; font-size: 14px; color: #aaa; margin-bottom: 10px;}
         
-        /* The New Live Graph */
+        /* The Live Graph */
         .graph-container { display: flex; justify-content: center; margin-top: 20px; width: 100%; }
         canvas { background-color: #1e1e1e; border: 2px solid #444; border-radius: 8px; width: 95%; max-width: 500px; height: 180px; }
     </style>
@@ -42,8 +40,16 @@
     <div class="controls">
         <button id="connectBtn">Connect BLE Tool</button>
         <button id="zeroBtn">Zero Sensors</button>
+        <select id="sensorProfile" onchange="sendSensorProfile()">
+            <option value="SET_3BAR">3-Bar MAP (Default)</option>
+            <option value="SET_2BAR">2-Bar MAP (Balanced)</option>
+            <option value="SET_1BAR">1-Bar MAP (Fast/Sensitive)</option>
+            <option value="SET_NOISY">Ultra-Smooth (For Noisy Sensors)</option>
+        </select>
     </div>
     <div id="status">Status: Disconnected</div>
+
+    <div id="rpmDisplay">RPM: 0</div>
 
     <div class="gauge-container">
         <div class="gauge"><div class="reference-line"></div><div class="bar" id="bar1" style="height: 50%;"></div></div>
@@ -73,24 +79,23 @@
     <script>
         const connectBtn = document.getElementById('connectBtn');
         const zeroBtn = document.getElementById('zeroBtn');
+        const profileSelect = document.getElementById('sensorProfile');
         const statusText = document.getElementById('status');
+        const rpmText = document.getElementById('rpmDisplay');
         
         const bars = [
             document.getElementById('bar1'), document.getElementById('bar2'),
             document.getElementById('bar3'), document.getElementById('bar4')
         ];
-        
         const vals = [
             document.getElementById('val1'), document.getElementById('val2'),
             document.getElementById('val3'), document.getElementById('val4')
         ];
 
-        // Canvas Setup
         const canvas = document.getElementById('historyGraph');
         const ctx = canvas.getContext('2d');
-        const graphColors = ["#00d2ff", "#ff007b", "#ffea00", "#b700ff"]; // Cyan, Pink, Yellow, Purple
+        const graphColors = ["#00d2ff", "#ff007b", "#ffea00", "#b700ff"]; 
         
-        // Data Logging Arrays (Stores the last 100 points per cylinder)
         const maxHistory = 100;
         let dataHistory = [[], [], [], []];
 
@@ -98,7 +103,6 @@
         const characteristicUuid = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
         let myCharacteristic;
 
-        // Tuning Variables
         const calibrationMultiplier = 0.15; 
         const greenThreshold = 3.0;  
         const yellowThreshold = 8.0; 
@@ -122,7 +126,9 @@
                 statusText.innerText = "Status: Connected!";
                 statusText.style.color = "#28a745";
                 connectBtn.style.display = "none";
+                
                 zeroBtn.style.display = "inline-block";
+                profileSelect.style.display = "inline-block";
 
             } catch (error) {
                 console.log(error);
@@ -135,17 +141,33 @@
                 const encoder = new TextEncoder();
                 await myCharacteristic.writeValue(encoder.encode("ZERO"));
                 statusText.innerText = "Sensors Zeroed!";
-                dataHistory = [[], [], [], []]; // Clear the graph on zero
+                dataHistory = [[], [], [], []]; 
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 setTimeout(() => statusText.innerText = "Status: Connected!", 2000);
             }
         });
 
+        async function sendSensorProfile() {
+            if (myCharacteristic) {
+                let selectedProfile = profileSelect.value;
+                const encoder = new TextEncoder();
+                await myCharacteristic.writeValue(encoder.encode(selectedProfile));
+                
+                statusText.innerText = "Profile Changed!";
+                setTimeout(() => statusText.innerText = "Status: Connected!", 2000);
+            }
+        }
+
         function handleData(event) {
             const value = new TextDecoder().decode(event.target.value);
             const data = value.split(',');
             
-            if(data.length === 4) {
+            // Look for exactly 5 pieces of data (V1, V2, V3, V4, RPM)
+            if(data.length === 5) {
+                
+                // Update the RPM text
+                rpmText.innerText = "RPM: " + data[4];
+
                 let scaledValues = [];
                 let total = 0;
 
@@ -154,10 +176,9 @@
                     scaledValues.push(val);
                     total += val;
                     
-                    // Log to history array for the graph
                     dataHistory[i].push(val);
                     if(dataHistory[i].length > maxHistory) {
-                        dataHistory[i].shift(); // Remove oldest data point
+                        dataHistory[i].shift(); 
                     }
                 }
 
@@ -169,7 +190,6 @@
 
                     let difference = Math.abs(currentVal - average);
 
-                    // Update Bar Colors based on how close they are to the average
                     if (difference <= greenThreshold) {
                         bars[i].style.backgroundColor = "#28a745"; 
                     } else if (difference <= yellowThreshold) {
@@ -183,25 +203,20 @@
                     bars[i].style.height = height + "%";
                 }
                 
-                // Draw the updated graph
                 drawGraph();
             }
         }
 
         function drawGraph() {
-            // Clear the canvas for the next frame
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Find the highest value currently on the screen to auto-scale the graph
-            let highestVal = 10; // Minimum scale
+            let highestVal = 10; 
             for(let i=0; i<4; i++) {
                 let maxInArray = Math.max(...dataHistory[i]);
                 if(maxInArray > highestVal) highestVal = maxInArray;
             }
-            // Add a little padding to the top
             highestVal *= 1.2; 
 
-            // Draw the lines
             ctx.lineWidth = 3;
             ctx.lineJoin = 'round';
 
@@ -212,10 +227,7 @@
                 ctx.strokeStyle = graphColors[i];
 
                 for(let j=0; j<dataHistory[i].length; j++) {
-                    // X axis: stretch the data points across the width of the canvas
                     let x = (j / (maxHistory - 1)) * canvas.width;
-                    
-                    // Y axis: scale the value to the canvas height (flipped because Y is down)
                     let y = canvas.height - ((dataHistory[i][j] / highestVal) * canvas.height);
                     
                     if(j === 0) {
