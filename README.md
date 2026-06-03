@@ -9,6 +9,9 @@ A DIY, somehow accurate, Bluetooth 4-cylinder digital sync tool for motorcycle c
 * **Live Sensor Profiles:** Swap mathematical filtering profiles instantly via the web app.
 * **Auto-Averaging:** Color-coded bars guide your physical adjustments.
 
+  [![Watch the Carbie-Syncer in action](https://img.youtube.com/vi/sldt1Y8_kuI/0.jpg)](https://youtube.com/shorts/sldt1Y8_kuI)
+  
+
 ## Bill of Materials
 * 1x **ESP32-S3 Development Board**
 * 4x **Automotive MAP Sensors** 3 pin, 5v (1-Bar recommended; cheap 3-Bar turbo sensors should work fine using the web app's heavier filter profiles).
