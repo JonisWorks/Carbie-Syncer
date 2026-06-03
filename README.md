@@ -63,6 +63,10 @@ There is nothing to install.
 
 5. **Tune**: Start the engine and adjust sync screws until all lines merge.
 
+## Additional Info
+
+Photos, proper wiring diagram, and video to follow.
+
 ## DISCLAIMER
 1. This project is provided "as is". While the 5V circuitry is generally very safe, I am not responsible for any damaged property, fires, or personal injury that may occur while building or using this tool or your bikes performance. While I want to help and provide this project as best as I can there could be bugs.   
 
