@@ -11,13 +11,14 @@
         #connectBtn { background-color: #007bff; color: white; cursor: pointer; }
         #zeroBtn { background-color: #dc3545; color: white; display: none; cursor: pointer; }
         
-        /* Bar Gauges */
-        .gauge-container { display: flex; justify-content: center; gap: 15px; margin-top: 10px; height: 250px; }
+        .checkbox-container { display: none; align-items: center; background-color: #333; padding: 10px 15px; border-radius: 8px; border: 1px solid #555; cursor: pointer; font-size: 14px;}
+        .checkbox-container input { margin-right: 8px; cursor: pointer; width: 16px; height: 16px;}
+
+        .gauge-container { display: flex; justify-content: center; gap: 15px; margin-top: 10px; height: 210px; }
         .gauge { width: 60px; background-color: #333; border-radius: 8px; position: relative; overflow: hidden; border: 2px solid #555; }
         .bar { width: 100%; position: absolute; bottom: 0; background-color: #28a745; transition: height 0.1s linear, background-color 0.2s ease; }
         .reference-line { position: absolute; width: 100%; height: 2px; background-color: rgba(255, 255, 255, 0.4); top: 50%; left: 0; z-index: 10; pointer-events: none;}
         
-        /* Text Readouts & RPM */
         .labels { display: flex; justify-content: center; gap: 15px; margin-top: 10px; font-size: 18px; font-weight: bold; }
         .label { width: 60px; text-align: center; }
         .readouts { display: flex; justify-content: center; gap: 15px; margin-top: 5px; font-size: 16px; font-weight: bold; }
@@ -28,7 +29,6 @@
         #c1 { color: #00d2ff; } #c2 { color: #ff007b; } #c3 { color: #ffea00; } #c4 { color: #b700ff; } 
         #status { margin-top: 5px; font-size: 14px; color: #aaa; margin-bottom: 10px;}
         
-        /* The Live Graph */
         .graph-container { display: flex; justify-content: center; margin-top: 20px; width: 100%; }
         canvas { background-color: #1e1e1e; border: 2px solid #444; border-radius: 8px; width: 95%; max-width: 500px; height: 180px; }
     </style>
@@ -41,11 +41,14 @@
         <button id="connectBtn">Connect BLE Tool</button>
         <button id="zeroBtn">Zero Sensors</button>
         <select id="sensorProfile" onchange="sendSensorProfile()">
-            <option value="SET_3BAR">3-Bar MAP (Default)</option>
-            <option value="SET_2BAR">2-Bar MAP (Balanced)</option>
-            <option value="SET_1BAR">1-Bar MAP (Fast/Sensitive)</option>
-            <option value="SET_NOISY">Ultra-Smooth (For Noisy Sensors)</option>
+            <option value="FILTER_HEAVY">Heavy Dampening (Stable Average - Default)</option>
+            <option value="FILTER_MEDIUM">Medium Dampening (Balanced)</option>
+            <option value="FILTER_LIGHT">Light Dampening (Fast/Sensitive)</option>
+            <option value="FILTER_MAX">Max Dampening (For erratic signals)</option>
         </select>
+        <label class="checkbox-container" id="peakContainer">
+            <input type="checkbox" id="peakToggle" onchange="togglePeakMode()"> Only Intake Strokes
+        </label>
     </div>
     <div id="status">Status: Disconnected</div>
 
@@ -80,6 +83,8 @@
         const connectBtn = document.getElementById('connectBtn');
         const zeroBtn = document.getElementById('zeroBtn');
         const profileSelect = document.getElementById('sensorProfile');
+        const peakContainer = document.getElementById('peakContainer');
+        const peakToggle = document.getElementById('peakToggle');
         const statusText = document.getElementById('status');
         const rpmText = document.getElementById('rpmDisplay');
         
@@ -129,6 +134,7 @@
                 
                 zeroBtn.style.display = "inline-block";
                 profileSelect.style.display = "inline-block";
+                peakContainer.style.display = "flex";
 
             } catch (error) {
                 console.log(error);
@@ -140,10 +146,8 @@
             if (myCharacteristic) {
                 const encoder = new TextEncoder();
                 await myCharacteristic.writeValue(encoder.encode("ZERO"));
-                statusText.innerText = "Sensors Zeroed!";
                 dataHistory = [[], [], [], []]; 
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                setTimeout(() => statusText.innerText = "Status: Connected!", 2000);
             }
         });
 
@@ -152,9 +156,14 @@
                 let selectedProfile = profileSelect.value;
                 const encoder = new TextEncoder();
                 await myCharacteristic.writeValue(encoder.encode(selectedProfile));
-                
-                statusText.innerText = "Profile Changed!";
-                setTimeout(() => statusText.innerText = "Status: Connected!", 2000);
+            }
+        }
+
+        async function togglePeakMode() {
+            if (myCharacteristic) {
+                const encoder = new TextEncoder();
+                let command = peakToggle.checked ? "PEAK_ON" : "PEAK_OFF";
+                await myCharacteristic.writeValue(encoder.encode(command));
             }
         }
 
@@ -162,11 +171,27 @@
             const value = new TextDecoder().decode(event.target.value);
             const data = value.split(',');
             
-            // Look for exactly 5 pieces of data (V1, V2, V3, V4, RPM)
             if(data.length === 5) {
-                
-                // Update the RPM text
-                rpmText.innerText = "RPM: " + data[4];
+                let currentRPM = parseInt(data[4]);
+                rpmText.innerText = "RPM: " + currentRPM;
+
+                if (peakToggle.checked) {
+                    if (currentRPM === 0) {
+                        statusText.innerText = "PEAK MODE IDLE: Waiting for engine pulse...";
+                        statusText.style.color = "#ffc107"; 
+                    } else {
+                        statusText.innerText = "PEAK MODE: Locked on intake strokes";
+                        statusText.style.color = "#28a745"; 
+                    }
+                } else {
+                    if (currentRPM > 0) {
+                        statusText.innerText = "Status: Engine Running (Averaging Mode)";
+                        statusText.style.color = "#28a745";
+                    } else {
+                        statusText.innerText = "Status: Connected & Ready";
+                        statusText.style.color = "#28a745";
+                    }
+                }
 
                 let scaledValues = [];
                 let total = 0;
@@ -198,6 +223,7 @@
                         bars[i].style.backgroundColor = "#dc3545"; 
                     }
 
+                    // Bar notch, resting baseline
                     let height = 50 - (parseInt(data[i]) * 0.25); 
                     height = Math.max(0, Math.min(100, height)); 
                     bars[i].style.height = height + "%";
